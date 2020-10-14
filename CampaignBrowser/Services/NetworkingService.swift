@@ -49,6 +49,7 @@ class NetworkingService {
     func createObservableResponse<T: Request>(request: T) -> Observable<T.ParsedResponseType> {
         return urlSession.rx
             .json(request: URLRequest(url: request.url))
+            .catchError { Observable.error($0 == NetworkError.noConnection ? NetworkError.noConnection : $0) }
             .map { rawData in
                 guard let data = rawData as? T.RawResponseType else {
                     throw UnexpectedResponse(response: rawData)

@@ -26,9 +26,30 @@ class CampaignListingViewController: UIViewController {
         ServiceLocator.instance.networkingService
             .createObservableResponse(request: CampaignListingRequest())
             .observeOn(MainScheduler.instance)
+            .retryWhen { [weak self] error in
+                error.flatMapLatest { error -> Observable<Void> in
+                    guard let self = self else { return .empty() }
+                    return self.showErrorAlert(with: error.localizedDescription)
+                }
+            }
             .subscribe(onNext: { [weak self] campaigns in
                 self?.typedView.display(campaigns: campaigns)
             })
             .disposed(by: disposeBag)
+    }
+}
+
+extension CampaignListingViewController {
+    func showErrorAlert(with message: String) -> Observable<Void> {
+        return Observable<Void>.create { [weak self] observer in
+            let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+            alert.addAction(UIAlertAction(title: "Retry", style: .default, handler: { _ in
+                observer.onNext(())
+                observer.onCompleted()
+            }))
+            self?.present(alert, animated: true, completion: nil)
+            return Disposables.create { alert.dismiss(animated: true, completion: nil) }
+        }
     }
 }
